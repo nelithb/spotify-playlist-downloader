@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spotify Playlist Downloader</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a1a;
+            color: white;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            background: #2a2a2a;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 800px;
+            margin: 20px;
+        }
+        h1, h2 {
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+        input {
+            width: 100%;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+            border: 1px solid #3a3a3a;
+            border-radius: 5px;
+            background: #333;
+            color: white;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 0.75rem;
+            background: #1db954;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 0.5rem 0;
+        }
+        button.secondary {
+            background: #666;
+        }
+        button:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+        #status {
+            margin-top: 1rem;
+            text-align: center;
+        }
+        .error {
+            color: #ff4444;
+        }
+        .song-list {
+            margin-top: 1rem;
+            max-height: 400px;
+            overflow-y: auto;
+            background: #222;
+            border-radius: 5px;
+            padding: 1rem;
+        }
+        .song-item {
+            padding: 0.5rem;
+            border-bottom: 1px solid #333;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .song-item:last-child {
+            border-bottom: none;
+        }
+        .song-info {
+            flex: 1;
+        }
+        .song-meta {
+            color: #888;
+            font-size: 0.9em;
+        }
+        .playlist-info {
+            background: #333;
+            padding: 1rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+        }
+        .button-group {
+            display: flex;
+            gap: 1rem;
+        }
+        .button-group button {
+            flex: 1;
+        }
+        .progress {
+            margin-top: 1rem;
+            padding: 1rem;
+            background: #333;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Spotify Playlist Downloader</h1>
+        <div id="urlInput">
+            <form id="downloadForm">
+                <input type="url" id="playlistUrl" placeholder="Paste Spotify playlist URL" required>
+                <button type="submit" id="submitBtn">Analyze Playlist</button>
+            </form>
+        </div>
+        <div id="playlistConfirmation" style="display: none;">
+            <div id="playlistInfo" class="playlist-info"></div>
+            <div id="songList" class="song-list"></div>
+            <div class="button-group">
+                <button class="secondary" onclick="resetForm()">Cancel</button>
+                <button id="confirmBtn" onclick="startDownload()">Start Download</button>
+            </div>
+        </div>
+        <div id="status"></div>
+    </div>
+
+    <script>
+        let currentSongs = null;
+        const form = document.getElementById('downloadForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const status = document.getElementById('status');
+        const urlInput = document.getElementById('urlInput');
+        const playlistConfirmation = document.getElementById('playlistConfirmation');
+        const playlistInfo = document.getElementById('playlistInfo');
+        const songList = document.getElementById('songList');
+        const confirmBtn = document.getElementById('confirmBtn');
+
+        function formatDuration(minutes) {
+            const mins = Math.floor(minutes);
+            const secs = Math.round((minutes - mins) * 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        function getKeyName(keyNumber, mode) {
+            if (keyNumber === null) return 'Unknown';
+            const keys = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+            return `${keys[keyNumber]} ${mode}`;
+        }
+
+        function resetForm() {
+            urlInput.style.display = 'block';
+            playlistConfirmation.style.display = 'none';
+            status.textContent = '';
+            form.reset();
+            currentSongs = null;
+        }
+
+        async function startDownload() {
+            if (!currentSongs) return;
+
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = 'Downloading...';
+            status.textContent = 'Starting download...';
+
+            try {
+                const response = await fetch('/convert', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ songs: currentSongs })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    status.textContent = `Downloaded ${data.songCount} songs successfully!`;
+                    window.location.href = `/downloads/${data.zipFile}`;
+                    setTimeout(resetForm, 3000);
+                } else {
+                    status.innerHTML = `<span class="error">Error: ${data.error}</span>`;
+                }
+            } catch (error) {
+                status.innerHTML = '<span class="error">Failed to process request</span>';
+            } finally {
+                confirmBtn.disabled = false;
+                confirmBtn.textContent = 'Start Download';
+            }
+        }
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const url = document.getElementById('playlistUrl').value;
+            
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Analyzing...';
+            status.textContent = 'Analyzing playlist...';
+            
+            try {
+                const response = await fetch('/convert', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success && data.phase === 'info') {
+                    // Show playlist information
+                    currentSongs = data.songs;
+                    playlistInfo.innerHTML = `
+                        <h2>${data.playlist_info.name}</h2>
+                        <p>By ${data.playlist_info.owner}</p>
+                        <p>${data.playlist_info.track_count} tracks</p>
+                    `;
+
+                    // Show song list
+                    songList.innerHTML = data.songs.map(song => `
+                        <div class="song-item">
+                            <div class="song-info">
+                                <div>${song.title}</div>
+                                <div class="song-meta">
+                                    ${song.artist} • ${formatDuration(song.duration)} • 
+                                    ${song.bpm ? `${song.bpm} BPM • ` : ''}
+                                    ${getKeyName(song.key, song.mode)}
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+
+                    urlInput.style.display = 'none';
+                    playlistConfirmation.style.display = 'block';
+                    status.textContent = '';
+                } else {
+                    status.innerHTML = `<span class="error">Error: ${data.error}</span>`;
+                }
+            } catch (error) {
+                status.innerHTML = '<span class="error">Failed to process request</span>';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Analyze Playlist';
+            }
+        });
+    </script>
+</body>
+</html>

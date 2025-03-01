@@ -1,0 +1,5 @@
+venv/
+downloads/temp/*
+downloads/playlist_downloads_*.zip
+__pycache__/
+*.pyc
