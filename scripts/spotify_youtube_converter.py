@@ -107,26 +107,51 @@ def get_youtube_links(songs):
 
 def download_song(song, url):
     """Download and convert a single song"""
-    safe_title = "".join(x for x in f"{song['artist']} - {song['title']}" if x.isalnum() or x in "- ")
-    output_path = os.path.join(TEMP_DIR, f'{safe_title}.%(ext)s')
-    
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }],
-        'outtmpl': output_path,
-        'quiet': True,
-        'no_warnings': True,
-        'logger': CustomLogger(),
-        'writethumbnail': False,
-        'postprocessor_args': [
-            '-metadata', f'title={song["title"]}',
-            '-metadata', f'artist={song["artist"]}'
-        ],
-    }
+    try:
+        log(f"Starting download for: {song['title']}")
+        # Sanitize filename
+        safe_title = "".join(x for x in f"{song['artist']} - {song['title']}" if x.isalnum() or x in "- ")
+        output_path = os.path.join(TEMP_DIR, f'{safe_title}.%(ext)s')
+        log(f"Output path: {output_path}")
+
+        ydl_opts = {
+            'format': 'bestaudio/best',
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
+            'outtmpl': output_path,
+            'quiet': False,  # Changed to False to see download progress
+            'no_warnings': False,  # Changed to False to see warnings
+            'logger': CustomLogger(),
+            'writethumbnail': False,
+            'postprocessor_args': [
+                '-metadata', f'title={song["title"]}',
+                '-metadata', f'artist={song["artist"]}'
+            ],
+        }
+
+        log(f"Starting YouTube-DL with options: {ydl_opts}")
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            log(f"Downloading from URL: {url}")
+            info = ydl.extract_info(url, download=True)
+            log(f"Download info: {info}")
+            
+            final_filename = f"{safe_title}.mp3"
+            final_path = os.path.join(TEMP_DIR, final_filename)
+            
+            if os.path.exists(final_path):
+                log(f"Successfully downloaded: {final_filename}")
+                return final_filename
+            else:
+                log(f"File not found after download: {final_path}")
+                return None
+
+    except Exception as e:
+        log(f"Error in download_song: {str(e)}")
+        log(traceback.format_exc())
+        return None
 
 def download_playlist(songs, links):
     """Download all songs and create ZIP file"""
