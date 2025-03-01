@@ -10,8 +10,9 @@ import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 import sys
-import subprocess  # Add this for the check_ffmpeg function
-import traceback  # You already have this
+import subprocess
+import traceback
+import shutil
 
 # Add dotenv handling for Railway deployment
 try:
@@ -24,21 +25,21 @@ except ImportError:
 DOWNLOADS_DIR = 'downloads'
 TEMP_DIR = os.path.join(DOWNLOADS_DIR, 'temp')
 
+# Define logging before any functions use it
 def log(message):
     """Log message to stderr for server to capture"""
     print(message, file=sys.stderr, flush=True)
 
-    
-# After defining initial paths
-FFMPEG_PATH = os.getenv('FFMPEG_PATH', 'ffmpeg')  # Default to just the binary name
+# Define global variables BEFORE any functions use them as globals
+FFMPEG_PATH = os.getenv('FFMPEG_PATH', 'ffmpeg')  # Default to binary name
 FFPROBE_PATH = os.getenv('FFPROBE_PATH', 'ffprobe')
 
+# Now define function that may alter these globals
 def find_and_set_ffmpeg():
     """Find and set FFmpeg paths"""
     log("Searching for FFmpeg...")
     
     # Try using the PATH
-    import shutil
     ffmpeg_path = shutil.which('ffmpeg')
     ffprobe_path = shutil.which('ffprobe')
     
@@ -73,7 +74,6 @@ def find_and_set_ffmpeg():
     
     # Last resort - search common directories
     try:
-        import subprocess
         result = subprocess.run(["find", "/usr", "-name", "ffmpeg", "-type", "f"], 
                                capture_output=True, text=True, timeout=10)
         paths = result.stdout.strip().split('\n')
@@ -95,26 +95,31 @@ def find_and_set_ffmpeg():
     log("Could not find FFmpeg and FFprobe!")
     return False
 
-
-
-# Try to find better paths
-find_and_set_ffmpeg()
-
-
+# Call the function AFTER it's defined
+try:
+    find_and_set_ffmpeg()
+    log(f"Final FFmpeg path: {FFMPEG_PATH}")
+    log(f"Final FFprobe path: {FFPROBE_PATH}")
+except Exception as e:
+    log(f"ERROR in FFmpeg detection: {e}")
+    log(traceback.format_exc())
 
 # Create directories if they don't exist
 os.makedirs(DOWNLOADS_DIR, exist_ok=True)
 os.makedirs(TEMP_DIR, exist_ok=True)
 
-def log(message):
-    """Log message to stderr for server to capture"""
-    print(message, file=sys.stderr, flush=True)
 
 class CustomLogger:
     """Custom logger for yt-dlp that redirects to our logging"""
-    def debug(self, msg): pass  # Skip debug messages
-    def warning(self, msg): log(f"Warning: {msg}")
-    def error(self, msg): log(f"Error: {msg}")
+
+    def debug(self, msg):
+        log(f"Debug: {msg}")  # Now logging debug messages
+
+    def warning(self, msg): 
+        log(f"Warning: {msg}")
+
+    def error(self, msg): 
+        log(f"Error: {msg}")
 
 def get_spotify_playlist_tracks(playlist_id):
     """Fetch tracks from Spotify playlist"""
