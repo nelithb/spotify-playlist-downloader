@@ -130,47 +130,58 @@ def download_song(song, url):
 
 def download_playlist(songs, links):
     """Download all songs and create ZIP file"""
+    log("Starting download_playlist function...")  # Add this
     downloaded_files = []
     successful_downloads = []
-    
+
     # Process downloads concurrently
     with ThreadPoolExecutor(max_workers=5) as executor:
+        log(f"Processing {len(songs)} songs...")  # Add this
         future_to_song = {
-            executor.submit(download_song, song, link): song 
-            for song, link in zip(songs, links) 
+            executor.submit(download_song, song, link): song
+            for song, link in zip(songs, links)
             if link != "No result found" and not link.startswith("Error:")
         }
         
         for future in as_completed(future_to_song):
             song = future_to_song[future]
+            log(f"Processing download for: {song['title']}")  # Add this
             file = future.result()
             if file:
+                log(f"Successfully downloaded: {file}")  # Add this
                 downloaded_files.append(file)
                 successful_downloads.append({
                     "title": song['title'],
                     "artist": song['artist'],
-                    "bpm": song['bpm'],
-                    "key": song['key'],
-                    "mode": song['mode'],
                     "duration": song['duration']
                 })
-    
+            else:
+                log(f"Failed to download: {song['title']}")  # Add this
+
     if not downloaded_files:
+        log("No files were downloaded successfully")  # Add this
         return None, successful_downloads
 
     # Create ZIP file
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     zip_filename = f'playlist_downloads_{timestamp}.zip'
     zip_path = os.path.join(DOWNLOADS_DIR, zip_filename)
-    
-    log(f"Creating zip file: {zip_filename}")
-    with zipfile.ZipFile(zip_path, 'w') as zipf:
-        for file in downloaded_files:
-            file_path = os.path.join(TEMP_DIR, file)
-            if os.path.exists(file_path):
-                zipf.write(file_path, file)
-                os.remove(file_path)  # Clean up temp file
-    
+    log(f"Creating zip file at: {zip_path}")  # Add this
+
+    try:
+        with zipfile.ZipFile(zip_path, 'w') as zipf:
+            for file in downloaded_files:
+                file_path = os.path.join(TEMP_DIR, file)
+                log(f"Adding to zip: {file_path}")  # Add this
+                if os.path.exists(file_path):
+                    zipf.write(file_path, file)
+                    os.remove(file_path)  # Clean up temp file
+                else:
+                    log(f"File not found: {file_path}")  # Add this
+    except Exception as e:
+        log(f"Error creating zip file: {str(e)}")  # Add this
+        return None, successful_downloads
+
     return zip_filename, successful_downloads
 
 def extract_playlist_id(playlist_url):
