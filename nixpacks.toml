@@ -1,8 +1,12 @@
 [phases.setup]
-    nixPkgs = ["python310", "ffmpeg", "zip"]
+nixPkgs = ["python310", "ffmpeg", "zip"]
 
 [phases.build]
-    cmds = [
-        "python3 -m pip install --upgrade pip",
-        "python3 -m pip install -r requirements.txt"
-    ]
+cmds = [
+  "python3 -m pip install --upgrade pip",
+  "python3 -m pip install -r requirements.txt"
+]
+
+# Make ffmpeg available to the application
+[start]
+cmd = "python3 app.py"  # Replace with your actual start command

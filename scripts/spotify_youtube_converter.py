@@ -115,24 +115,83 @@ def get_youtube_links(songs):
 def download_song(song, url):
     try:
         log(f"Starting download for: {song['title']}")
-        # Get FFmpeg and FFprobe paths directly from environment variables
-        ffmpeg_path = os.environ.get('FFMPEG_LOCATION', '/bin/ffmpeg')
-        ffprobe_path = os.environ.get('FFPROBE_LOCATION', '/bin/ffprobe')
-        log(f"Using FFmpeg from environment: {ffmpeg_path}")
-        log(f"Using FFprobe from environment: {ffprobe_path}")
-        # Quick test to directly call FFmpeg to verify it works
-        try:
-            subprocess.run([ffmpeg_path, "-version"], capture_output=True, check=True, timeout=5)
-            log("FFmpeg direct call successful")
-        except Exception as e:
-            log(f"Warning: Direct FFmpeg call failed: {str(e)}")
         
+        # Try to find FFmpeg and FFprobe in common locations
+        ffmpeg_locations = [
+            "ffmpeg",  # Look in PATH
+            "/usr/bin/ffmpeg",
+            "/usr/local/bin/ffmpeg",
+            "/nix/store/*/ffmpeg/bin/ffmpeg"  # Nixpacks often installs here
+        ]
+        
+        ffprobe_locations = [
+            "ffprobe",  # Look in PATH
+            "/usr/bin/ffprobe",
+            "/usr/local/bin/ffprobe",
+            "/nix/store/*/ffmpeg/bin/ffprobe"  # Nixpacks often installs here
+        ]
+        
+        # Log available paths
+        try:
+            import glob
+            for pattern in ["/nix/store/*/ffmpeg/bin/ffmpeg", "/nix/store/*/bin/ffmpeg"]:
+                matches = glob.glob(pattern)
+                for match in matches:
+                    log(f"Found potential FFmpeg at: {match}")
+            
+            # Check if ffmpeg is in PATH
+            result = subprocess.run(["which", "ffmpeg"], capture_output=True, text=True)
+            if result.returncode == 0:
+                log(f"FFmpeg found in PATH at: {result.stdout.strip()}")
+            else:
+                log("FFmpeg not found in PATH")
+                
+            # List contents of /nix/store to help diagnose
+            if os.path.exists("/nix/store"):
+                nix_dirs = os.listdir("/nix/store")
+                ffmpeg_dirs = [d for d in nix_dirs if "ffmpeg" in d]
+                if ffmpeg_dirs:
+                    log(f"Found potential FFmpeg directories in /nix/store: {ffmpeg_dirs}")
+        except Exception as e:
+            log(f"Error during path discovery: {str(e)}")
+        
+        # Use the first working FFmpeg we find
+        ffmpeg_path = None
+        for loc in ffmpeg_locations:
+            if '*' in loc:
+                # Handle glob patterns
+                import glob
+                matches = glob.glob(loc)
+                for match in matches:
+                    try:
+                        result = subprocess.run([match, "-version"], capture_output=True, check=True, timeout=5)
+                        log(f"Found working FFmpeg at: {match}")
+                        ffmpeg_path = match
+                        break
+                    except Exception:
+                        continue
+            else:
+                try:
+                    result = subprocess.run([loc, "-version"], capture_output=True, check=True, timeout=5)
+                    log(f"Found working FFmpeg at: {loc}")
+                    ffmpeg_path = loc
+                    break
+                except Exception:
+                    continue
+        
+        if not ffmpeg_path:
+            log("ERROR: Could not find a working FFmpeg installation!")
+            return None
+            
+        log(f"Using FFmpeg from: {ffmpeg_path}")
+        
+        # Rest of your function...
         safe_title = "".join(x for x in f"{song['artist']} - {song['title']}" if x.isalnum() or x in "- ")
         output_path = os.path.join(TEMP_DIR, f'{safe_title}.%(ext)s')
         
         ydl_opts = {
             'format': 'bestaudio/best',
-            'ffmpeg_location': ffmpeg_path,  # Use environment variable directly
+            'ffmpeg_location': os.path.dirname(ffmpeg_path),  # Pass the directory containing ffmpeg
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
@@ -149,7 +208,7 @@ def download_song(song, url):
             ],
         }
         
-        log(f"Starting download with yt-dlp, FFmpeg path: {ffmpeg_path}")
+        log(f"Starting download with yt-dlp, FFmpeg path: {os.path.dirname(ffmpeg_path)}")
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
         
