@@ -129,7 +129,7 @@ def download_song(song, url):
 
         ydl_opts = {
             'format': 'bestaudio/best',
-            'ffmpeg_location': '/usr/bin/ffmpeg' if os.path.exists('/usr/bin/ffmpeg') else 'ffmpeg',  # Add this line
+            'ffmpeg_location': '/nix/store/ffmpeg/bin/ffmpeg',  # Add this line
             'postprocessors': [{
             'key': 'FFmpegExtractAudio',
             'preferredcodec': 'mp3',
