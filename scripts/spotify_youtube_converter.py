@@ -24,6 +24,10 @@ except ImportError:
 DOWNLOADS_DIR = 'downloads'
 TEMP_DIR = os.path.join(DOWNLOADS_DIR, 'temp')
 
+# Add these constants after the directory setup
+FFMPEG_PATH = os.getenv('FFMPEG_PATH', '/usr/bin/ffmpeg')
+FFPROBE_PATH = os.getenv('FFPROBE_PATH', '/usr/bin/ffprobe')
+
 # Create directories if they don't exist
 os.makedirs(DOWNLOADS_DIR, exist_ok=True)
 os.makedirs(TEMP_DIR, exist_ok=True)
@@ -109,47 +113,26 @@ def get_youtube_links(songs):
 def check_ffmpeg():
     """Check if FFmpeg is available"""
     try:
-        subprocess.run(['ffmpeg', '-version'], capture_output=True)
+        # Check the environment variable path first
+        result = subprocess.run([FFMPEG_PATH, '-version'], capture_output=True)
+        log(f"FFmpeg found at: {FFMPEG_PATH}")
         return True
     except Exception as e:
         log(f"FFmpeg check failed: {str(e)}")
         return False
 
 def download_song(song, url):
-    """Download and convert a single song"""
     try:
         log(f"Starting download for: {song['title']}")
-
+        
         # Sanitize filename
         safe_title = "".join(x for x in f"{song['artist']} - {song['title']}" if x.isalnum() or x in "- ")
         output_path = os.path.join(TEMP_DIR, f'{safe_title}.%(ext)s')
-        log(f"Output path: {output_path}")
-
-        # Try to find ffmpeg in standard locations
-        ffmpeg_paths = [
-            'ffmpeg',
-            '/usr/bin/ffmpeg',
-            '/usr/local/bin/ffmpeg',
-            '/nix/var/nix/profiles/default/bin/ffmpeg'
-        ]
-
-        ffmpeg_path = None
-        for path in ffmpeg_paths:
-            try:
-                subprocess.run([path, '-version'], capture_output=True)
-                ffmpeg_path = path
-                log(f"Found ffmpeg at: {path}")
-                break
-            except:
-                continue
-
-        if not ffmpeg_path:
-            log("FFmpeg not found in system")
-            return None
-
+        
+        # Use the environment variable path
         ydl_opts = {
             'format': 'bestaudio/best',
-            'ffmpeg_location': ffmpeg_path,
+            'ffmpeg_location': FFMPEG_PATH,  # Use environment variable
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
@@ -165,13 +148,13 @@ def download_song(song, url):
                 '-metadata', f'artist={song["artist"]}'
             ],
         }
-
+        
+        # Remove the ffmpeg path detection loop since we're using environment variables
+        
         log(f"Starting YouTube-DL with options: {ydl_opts}")
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             log(f"Downloading from URL: {url}")
             info = ydl.extract_info(url, download=True)
-            log(f"Download info: {info}")
-            
             final_filename = f"{safe_title}.mp3"
             final_path = os.path.join(TEMP_DIR, final_filename)
             
@@ -181,7 +164,7 @@ def download_song(song, url):
             else:
                 log(f"File not found after download: {final_path}")
                 return None
-
+                
     except Exception as e:
         log(f"Error in download_song: {str(e)}")
         log(traceback.format_exc())

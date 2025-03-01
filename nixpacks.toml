@@ -1,6 +1,6 @@
 [phases.setup]
-    nixPkgs = ['...', 'ffmpeg']
-    
-    [phases.build]
-cmds = ['which ffmpeg']
+aptPkgs = ["ffmpeg"]
 
+[variables]
+FFMPEG_PATH = "/usr/bin/ffmpeg"
+FFPROBE_PATH = "/usr/bin/ffprobe"
