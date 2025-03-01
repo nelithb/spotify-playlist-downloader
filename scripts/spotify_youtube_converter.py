@@ -25,8 +25,8 @@ DOWNLOADS_DIR = 'downloads'
 TEMP_DIR = os.path.join(DOWNLOADS_DIR, 'temp')
 
 # Add these constants after the directory setup
-FFMPEG_PATH = os.getenv('FFMPEG_PATH', '/usr/bin/ffmpeg')
-FFPROBE_PATH = os.getenv('FFPROBE_PATH', '/usr/bin/ffprobe')
+FFMPEG_PATH = os.getenv('FFMPEG_PATH', '/opt/homebrew/bin/ffmpeg')
+FFPROBE_PATH = os.getenv('FFPROBE_PATH', '/opt/homebrew/bin/ffprobe')
 
 # Create directories if they don't exist
 os.makedirs(DOWNLOADS_DIR, exist_ok=True)
