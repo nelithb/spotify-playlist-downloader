@@ -185,13 +185,35 @@ def download_song(song, url):
             
         log(f"Using FFmpeg from: {ffmpeg_path}")
         
-        # Rest of your function...
+        # Find the full path when ffmpeg_path is just the command name
+        if ffmpeg_path == "ffmpeg":
+            # Get the full path
+            try:
+                full_path_result = subprocess.run(["which", "ffmpeg"], capture_output=True, text=True, check=True)
+                ffmpeg_path = full_path_result.stdout.strip()
+                log(f"Resolved FFmpeg full path: {ffmpeg_path}")
+            except Exception as e:
+                log(f"Error resolving full path: {str(e)}")
+                # Fallback to known path from logs
+                ffmpeg_path = "/root/.nix-profile/bin/ffmpeg"
+                log(f"Using fallback FFmpeg path: {ffmpeg_path}")
+
+        # Now extract the directory
+        ffmpeg_dir = os.path.dirname(ffmpeg_path)
+
+        # Check if directory is not empty
+        if not ffmpeg_dir:
+            log("WARNING: FFmpeg directory is empty, using hardcoded path")
+            ffmpeg_dir = "/root/.nix-profile/bin"  # Based on your logs
+
+        log(f"Using FFmpeg directory: {ffmpeg_dir}")
+        
         safe_title = "".join(x for x in f"{song['artist']} - {song['title']}" if x.isalnum() or x in "- ")
         output_path = os.path.join(TEMP_DIR, f'{safe_title}.%(ext)s')
         
         ydl_opts = {
             'format': 'bestaudio/best',
-            'ffmpeg_location': os.path.dirname(ffmpeg_path),  # Pass the directory containing ffmpeg
+            'ffmpeg_location': ffmpeg_dir,  # Pass the directory containing ffmpeg
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
@@ -208,7 +230,7 @@ def download_song(song, url):
             ],
         }
         
-        log(f"Starting download with yt-dlp, FFmpeg path: {os.path.dirname(ffmpeg_path)}")
+        log(f"Starting download with yt-dlp, FFmpeg directory: {ffmpeg_dir}")
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
         
@@ -222,11 +244,11 @@ def download_song(song, url):
             log(f"File not found after download: {final_path}")
             return None
             
+
     except Exception as e:
         log(f"Error in download_song: {str(e)}")
         log(traceback.format_exc())
         return None
-
 
 def download_playlist(songs, links):
     """Download all songs and create ZIP file"""
