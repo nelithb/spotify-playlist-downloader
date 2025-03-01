@@ -30,9 +30,9 @@ def log(message):
     """Log message to stderr for server to capture"""
     print(message, file=sys.stderr, flush=True)
 
-# Define global variables BEFORE any functions use them as globals
-FFMPEG_PATH = os.getenv('FFMPEG_PATH', 'ffmpeg')  # Default to binary name
-FFPROBE_PATH = os.getenv('FFPROBE_PATH', 'ffprobe')
+# Define global variables BEFORE any functions use them as globals.  Initialization is key.
+FFMPEG_PATH = None  # Initialize to None 
+FFPROBE_PATH = None # Initialize to None
 
 # Now define function that may alter these globals
 def find_and_set_ffmpeg():
@@ -95,16 +95,14 @@ def find_and_set_ffmpeg():
     log("Could not find FFmpeg and FFprobe!")
     return False
 
-# Call the function AFTER it's defined
-try:
-    find_and_set_ffmpeg()
-    log(f"Final FFmpeg path: {FFMPEG_PATH}")
-    log(f"Final FFprobe path: {FFPROBE_PATH}")
-except Exception as e:
-    log(f"ERROR in FFmpeg detection: {e}")
-    log(traceback.format_exc())
+# Call find_and_set_ffmpeg AFTER defining it.
+find_and_set_ffmpeg()
 
-# Create directories if they don't exist
+
+
+
+
+# Create directories *after* setting paths.
 os.makedirs(DOWNLOADS_DIR, exist_ok=True)
 os.makedirs(TEMP_DIR, exist_ok=True)
 
