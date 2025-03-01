@@ -24,6 +24,15 @@ except ImportError:
 DOWNLOADS_DIR = 'downloads'
 TEMP_DIR = os.path.join(DOWNLOADS_DIR, 'temp')
 
+def log(message):
+    """Log message to stderr for server to capture"""
+    print(message, file=sys.stderr, flush=True)
+
+    
+# After defining initial paths
+FFMPEG_PATH = os.getenv('FFMPEG_PATH', 'ffmpeg')  # Default to just the binary name
+FFPROBE_PATH = os.getenv('FFPROBE_PATH', 'ffprobe')
+
 def find_and_set_ffmpeg():
     """Find and set FFmpeg paths"""
     log("Searching for FFmpeg...")
@@ -86,9 +95,7 @@ def find_and_set_ffmpeg():
     log("Could not find FFmpeg and FFprobe!")
     return False
 
-# After defining initial paths
-FFMPEG_PATH = os.getenv('FFMPEG_PATH', 'ffmpeg')  # Default to just the binary name
-FFPROBE_PATH = os.getenv('FFPROBE_PATH', 'ffprobe')
+
 
 # Try to find better paths
 find_and_set_ffmpeg()
