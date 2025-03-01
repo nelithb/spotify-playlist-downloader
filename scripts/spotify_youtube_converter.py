@@ -13,6 +13,7 @@ import subprocess
 import traceback
 import shutil
 
+
 # Dotenv handling for Railway deployment (if applicable)
 try:
     from dotenv import load_dotenv
@@ -28,30 +29,32 @@ os.makedirs(DOWNLOADS_DIR, exist_ok=True)
 os.makedirs(TEMP_DIR, exist_ok=True)
 
 
-
 def log(message):
     """Log message to stderr for server to capture"""
     print(message, file=sys.stderr, flush=True)
 
 
 def get_ffmpeg_paths():
-    """Quickly locate FFmpeg and FFprobe using the system PATH or environment variables"""
-    ffmpeg = os.getenv("FFMPEG_PATH", shutil.which("ffmpeg"))
-    ffprobe = os.getenv("FFPROBE_PATH", shutil.which("ffprobe"))
+    """Locate FFmpeg and FFprobe using environment variables or system PATH"""
+    # Use the environment variables you set in Railway
+    ffmpeg = os.getenv("FFMPEG_LOCATION", shutil.which("ffmpeg"))
+    ffprobe = os.getenv("FFPROBE_LOCATION", shutil.which("ffprobe"))
+    
+    # Log the values for debugging
+    log(f"Environment FFMPEG_LOCATION: {os.environ.get('FFMPEG_LOCATION', 'Not set')}")
+    log(f"Environment FFPROBE_LOCATION: {os.environ.get('FFPROBE_LOCATION', 'Not set')}")
 
     if ffmpeg and ffprobe:
         log(f"Found FFmpeg at: {ffmpeg}")
         log(f"Found FFprobe at: {ffprobe}")
         return ffmpeg, ffprobe
     else:
-        log("FFmpeg or FFprobe not found via PATH or environment variables.")
+        log("FFmpeg or FFprobe not found via environment variables or PATH.")
         sys.exit(1)  # Or handle error appropriately for your server application
 
 
 # Get FFmpeg paths at the start of the script
 FFMPEG_PATH, FFPROBE_PATH = get_ffmpeg_paths()
-
-
 
 
 class CustomLogger:
@@ -132,7 +135,7 @@ def get_youtube_links(songs):
     return youtube_links
 
 
-def check_ffmpeg():  # Might not be needed if you do the check in get_ffmpeg_paths()
+def check_ffmpeg():
     try:
         result = subprocess.run([FFMPEG_PATH, '-version'], capture_output=True)
         log(f"FFmpeg check successful: {result.stdout.decode().strip()}")
@@ -142,17 +145,22 @@ def check_ffmpeg():  # Might not be needed if you do the check in get_ffmpeg_pat
         return False
 
 
-
 def download_song(song, url):
     try:
         log(f"Starting download for: {song['title']}")
+        
+        # Make sure FFmpeg path exists
+        if not os.path.exists(FFMPEG_PATH):
+            log(f"Warning: FFmpeg not found at path: {FFMPEG_PATH}")
+        else:
+            log(f"Using FFmpeg from: {FFMPEG_PATH}")
 
         safe_title = "".join(x for x in f"{song['artist']} - {song['title']}" if x.isalnum() or x in "- ")
         output_path = os.path.join(TEMP_DIR, f'{safe_title}.%(ext)s')
 
         ydl_opts = {
             'format': 'bestaudio/best',
-            **({"ffmpeg_location": FFMPEG_PATH} if FFMPEG_PATH and os.path.isabs(FFMPEG_PATH) else {}),
+            'ffmpeg_location': FFMPEG_PATH,  # Always include the FFmpeg location
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
@@ -169,6 +177,8 @@ def download_song(song, url):
             ],
         }
 
+        log(f"Starting download with yt-dlp, FFmpeg path: {FFMPEG_PATH}")
+        
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
 
@@ -212,7 +222,6 @@ def download_playlist(songs, links):
                     "duration": song['duration']
                 })
 
-
     if not downloaded_files:
         log("No files were downloaded successfully")
         return None, successful_downloads
@@ -235,7 +244,6 @@ def download_playlist(songs, links):
         return None, successful_downloads
 
     return zip_filename, successful_downloads
-
 
 
 def extract_playlist_id(playlist_url):
@@ -274,7 +282,6 @@ def process_playlist(playlist_url):
         return {"success": False, "error": str(e)}
 
 
-
 def start_download(songs):
     """Start the actual download process after confirmation"""
     try:
@@ -295,22 +302,18 @@ def start_download(songs):
                     "downloadedSongs": successful_downloads
                 }
 
-
         return {
             "success": False,
             "error": "Failed to create zip file or no songs were downloaded",
             "songCount": len(songs),
-
             "errors": errors,
             "downloadedSongs": successful_downloads
         }
-
 
     except Exception as e:
         log(f"Error during download: {str(e)}")
         log(traceback.format_exc())
         return {"success": False, "error": str(e)}
-
 
 
 def cleanup_temp_files():
