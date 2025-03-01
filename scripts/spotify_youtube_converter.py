@@ -105,6 +105,7 @@ def get_youtube_links(songs):
             youtube_links.append("Error: Could not search")
     
     return youtube_links
+
 def check_ffmpeg():
     """Check if FFmpeg is available"""
     try:
@@ -115,29 +116,48 @@ def check_ffmpeg():
         return False
 
 def download_song(song, url):
-    if not check_ffmpeg():
-        log("FFmpeg not found in system")
-        return None
-    # ... rest of the function
     """Download and convert a single song"""
     try:
         log(f"Starting download for: {song['title']}")
+
         # Sanitize filename
         safe_title = "".join(x for x in f"{song['artist']} - {song['title']}" if x.isalnum() or x in "- ")
         output_path = os.path.join(TEMP_DIR, f'{safe_title}.%(ext)s')
         log(f"Output path: {output_path}")
 
+        # Try to find ffmpeg in standard locations
+        ffmpeg_paths = [
+            'ffmpeg',
+            '/usr/bin/ffmpeg',
+            '/usr/local/bin/ffmpeg',
+            '/nix/var/nix/profiles/default/bin/ffmpeg'
+        ]
+
+        ffmpeg_path = None
+        for path in ffmpeg_paths:
+            try:
+                subprocess.run([path, '-version'], capture_output=True)
+                ffmpeg_path = path
+                log(f"Found ffmpeg at: {path}")
+                break
+            except:
+                continue
+
+        if not ffmpeg_path:
+            log("FFmpeg not found in system")
+            return None
+
         ydl_opts = {
             'format': 'bestaudio/best',
-            'ffmpeg_location': '/nix/store/ffmpeg/bin/ffmpeg',  # Add this line
+            'ffmpeg_location': ffmpeg_path,
             'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-             'preferredquality': '192',
-             }],
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }],
             'outtmpl': output_path,
-            'quiet': False,  # Changed to False to see download progress
-            'no_warnings': False,  # Changed to False to see warnings
+            'quiet': False,
+            'no_warnings': False,
             'logger': CustomLogger(),
             'writethumbnail': False,
             'postprocessor_args': [
@@ -166,7 +186,6 @@ def download_song(song, url):
         log(f"Error in download_song: {str(e)}")
         log(traceback.format_exc())
         return None
-
 def download_playlist(songs, links):
     """Download all songs and create ZIP file"""
     log("Starting download_playlist function...")  # Add this
