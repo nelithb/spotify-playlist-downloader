@@ -1,0 +1,5 @@
+[build]
+builder = "ubuntu-22.04"
+
+[packages]
+ffmpeg = "latest"
