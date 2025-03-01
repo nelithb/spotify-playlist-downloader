@@ -2,6 +2,8 @@ flask
 spotipy
 youtube-dl
 pytube
+yt-dlp
+
 
 google-api-python-client
 google-auth-httplib2
