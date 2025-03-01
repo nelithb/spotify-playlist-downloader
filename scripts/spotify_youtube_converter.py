@@ -10,7 +10,8 @@ import zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 import sys
-import traceback
+import subprocess  # Add this for the check_ffmpeg function
+import traceback  # You already have this
 
 # Add dotenv handling for Railway deployment
 try:
@@ -104,8 +105,20 @@ def get_youtube_links(songs):
             youtube_links.append("Error: Could not search")
     
     return youtube_links
+def check_ffmpeg():
+    """Check if FFmpeg is available"""
+    try:
+        subprocess.run(['ffmpeg', '-version'], capture_output=True)
+        return True
+    except Exception as e:
+        log(f"FFmpeg check failed: {str(e)}")
+        return False
 
 def download_song(song, url):
+    if not check_ffmpeg():
+        log("FFmpeg not found in system")
+        return None
+    # ... rest of the function
     """Download and convert a single song"""
     try:
         log(f"Starting download for: {song['title']}")
@@ -116,11 +129,12 @@ def download_song(song, url):
 
         ydl_opts = {
             'format': 'bestaudio/best',
+            'ffmpeg_location': '/usr/bin/ffmpeg' if os.path.exists('/usr/bin/ffmpeg') else 'ffmpeg',  # Add this line
             'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }],
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'mp3',
+             'preferredquality': '192',
+             }],
             'outtmpl': output_path,
             'quiet': False,  # Changed to False to see download progress
             'no_warnings': False,  # Changed to False to see warnings
