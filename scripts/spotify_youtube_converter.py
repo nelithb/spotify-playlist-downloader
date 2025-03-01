@@ -38,7 +38,7 @@ class CustomLogger:
     def error(self, msg): log(f"Error: {msg}")
 
 def get_spotify_playlist_tracks(playlist_id):
-    """Fetch tracks and their audio features from Spotify playlist"""
+    """Fetch tracks from Spotify playlist"""
     log("Fetching Spotify playlist tracks...")
     client_credentials_manager = SpotifyClientCredentials(
         client_id=os.getenv('SPOTIPY_CLIENT_ID'),
@@ -50,38 +50,20 @@ def get_spotify_playlist_tracks(playlist_id):
     playlist_info = sp.playlist(playlist_id)
     playlist_name = playlist_info['name']
     playlist_owner = playlist_info['owner']['display_name']
-    
     results = sp.playlist_tracks(playlist_id)
     tracks = results['items']
     
     songs = []
     for track in tracks:
         if track['track']:  # Check if track exists
-            track_id = track['track']['id']
             song = track['track']['name']
             artist = track['track']['artists'][0]['name'] if track['track']['artists'] else 'Unknown Artist'
             duration_ms = track['track']['duration_ms']
             duration_min = round(duration_ms / 60000, 2)  # Convert to minutes
             
-            # Get audio features for the track
-            try:
-                audio_features = sp.audio_features([track_id])[0]
-                if audio_features:
-                    tempo = round(audio_features['tempo'])
-                    key = audio_features['key']
-                    mode = 'Major' if audio_features['mode'] == 1 else 'Minor'
-                else:
-                    tempo = key = mode = None
-            except Exception as e:
-                log(f"Error getting audio features for {song}: {str(e)}")
-                tempo = key = mode = None
-            
             songs.append({
                 "title": song,
                 "artist": artist,
-                "bpm": tempo,
-                "key": key,
-                "mode": mode,
                 "duration": duration_min
             })
     
@@ -125,13 +107,8 @@ def get_youtube_links(songs):
 
 def download_song(song, url):
     """Download and convert a single song"""
-    # Sanitize filename and create safe paths
     safe_title = "".join(x for x in f"{song['artist']} - {song['title']}" if x.isalnum() or x in "- ")
     output_path = os.path.join(TEMP_DIR, f'{safe_title}.%(ext)s')
-    
-    # Handle key string creation
-    key_names = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B']
-    key_str = f"{key_names[song['key']]} {song['mode']}" if song.get('key') is not None and song.get('mode') is not None else "Unknown"
     
     ydl_opts = {
         'format': 'bestaudio/best',
@@ -147,30 +124,9 @@ def download_song(song, url):
         'writethumbnail': False,
         'postprocessor_args': [
             '-metadata', f'title={song["title"]}',
-            '-metadata', f'artist={song["artist"]}',
-            '-metadata', f'BPM={song.get("bpm", "")}',
-            '-metadata', f'KEY={key_str}'
+            '-metadata', f'artist={song["artist"]}'
         ],
     }
-    
-    try:
-        log(f"Downloading: {song['artist']} - {song['title']} (BPM: {song.get('bpm', 'Unknown')}, Key: {key_str})")
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            final_filename = f"{safe_title}.mp3"
-            final_path = os.path.join(TEMP_DIR, final_filename)
-            
-            # Ensure the file exists
-            if os.path.exists(final_path):
-                log(f"Successfully downloaded: {final_filename}")
-                return final_filename
-            else:
-                log(f"File not found after download: {final_path}")
-                return None
-                
-    except Exception as e:
-        log(f"Error downloading {song['title']}: {str(e)}")
-        return None
 
 def download_playlist(songs, links):
     """Download all songs and create ZIP file"""
