@@ -12,8 +12,12 @@ from datetime import datetime
 import sys
 import traceback
 
-# Load environment variables
-load_dotenv()
+# Add dotenv handling for Railway deployment
+try:
+    from dotenv import load_dotenv
+    load_dotenv()  # this will only run locally
+except ImportError:
+    pass  # when on Railway, we don't need dotenv
 
 # Directory Setup
 DOWNLOADS_DIR = 'downloads'
