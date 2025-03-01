@@ -24,9 +24,76 @@ except ImportError:
 DOWNLOADS_DIR = 'downloads'
 TEMP_DIR = os.path.join(DOWNLOADS_DIR, 'temp')
 
-# Add these constants after the directory setup
-FFMPEG_PATH = os.getenv('FFMPEG_PATH', '/opt/homebrew/bin/ffmpeg')
-FFPROBE_PATH = os.getenv('FFPROBE_PATH', '/opt/homebrew/bin/ffprobe')
+def find_and_set_ffmpeg():
+    """Find and set FFmpeg paths"""
+    log("Searching for FFmpeg...")
+    
+    # Try using the PATH
+    import shutil
+    ffmpeg_path = shutil.which('ffmpeg')
+    ffprobe_path = shutil.which('ffprobe')
+    
+    if ffmpeg_path and ffprobe_path:
+        log(f"Found FFmpeg in PATH: {ffmpeg_path}")
+        log(f"Found FFprobe in PATH: {ffprobe_path}")
+        global FFMPEG_PATH, FFPROBE_PATH
+        FFMPEG_PATH = ffmpeg_path
+        FFPROBE_PATH = ffprobe_path
+        return True
+    
+    # Try common locations
+    common_locations = [
+        '/usr/bin',
+        '/usr/local/bin',
+        '/opt/homebrew/bin',
+        '/opt/ffmpeg/bin',
+        '/app/bin'
+    ]
+    
+    for location in common_locations:
+        ffmpeg = os.path.join(location, 'ffmpeg')
+        ffprobe = os.path.join(location, 'ffprobe')
+        
+        if os.path.exists(ffmpeg) and os.path.exists(ffprobe):
+            log(f"Found FFmpeg in: {ffmpeg}")
+            log(f"Found FFprobe in: {ffprobe}")
+            global FFMPEG_PATH, FFPROBE_PATH
+            FFMPEG_PATH = ffmpeg
+            FFPROBE_PATH = ffprobe
+            return True
+    
+    # Last resort - search common directories
+    try:
+        import subprocess
+        result = subprocess.run(["find", "/usr", "-name", "ffmpeg", "-type", "f"], 
+                               capture_output=True, text=True, timeout=10)
+        paths = result.stdout.strip().split('\n')
+        if paths and paths[0]:
+            log(f"Found FFmpeg at: {paths[0]}")
+            global FFMPEG_PATH
+            FFMPEG_PATH = paths[0]
+            
+            # Try to find ffprobe near ffmpeg
+            ffprobe = paths[0].replace('ffmpeg', 'ffprobe')
+            if os.path.exists(ffprobe):
+                log(f"Found FFprobe at: {ffprobe}")
+                global FFPROBE_PATH
+                FFPROBE_PATH = ffprobe
+                return True
+    except Exception as e:
+        log(f"Error searching filesystem for FFmpeg: {e}")
+    
+    log("Could not find FFmpeg and FFprobe!")
+    return False
+
+# After defining initial paths
+FFMPEG_PATH = os.getenv('FFMPEG_PATH', 'ffmpeg')  # Default to just the binary name
+FFPROBE_PATH = os.getenv('FFPROBE_PATH', 'ffprobe')
+
+# Try to find better paths
+find_and_set_ffmpeg()
+
+
 
 # Create directories if they don't exist
 os.makedirs(DOWNLOADS_DIR, exist_ok=True)
@@ -132,7 +199,7 @@ def download_song(song, url):
         # Use the environment variable path
         ydl_opts = {
             'format': 'bestaudio/best',
-            'ffmpeg_location': FFMPEG_PATH,  # Use environment variable
+            **({"ffmpeg_location": FFMPEG_PATH} if os.path.isabs(FFMPEG_PATH) else {}),
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
