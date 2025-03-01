@@ -1,6 +1,6 @@
 [phases.setup]
-    nixPkgs = ['...', 'ffmpeg', 'ffprobe'
+    nixPkgs = ['...', 'ffmpeg', 'ffprobe']
     
     [phases.build]
-cmds = ['which ffmpeg']]
+cmds = ['which ffmpeg']
 
